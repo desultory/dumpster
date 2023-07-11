@@ -3,7 +3,7 @@ Dumpster reads netfilter logs, parses them, and then acts on them.
 
 """
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 from zen_custom import class_logger, threaded, thread_wrapped, add_thread
 from queue import Queue
@@ -35,6 +35,19 @@ class NetFilterLogLine:
                      'DPT': 'Destination port',
                      'L4_LEN': 'Length of layer 4 portion'}
 
+    NF_Flags = {'ACK': 'TCP Acknowledgement',
+                'FIN': 'TCP Finish',
+                'SYN': 'TCP Synchronize',
+                'RST': 'TCP Reset',
+                'PSH': 'TCP Push',
+                'URG': 'TCP Urgent',
+                'ECE': 'TCP ECN-Echo',
+                'ECT': 'TCP ECN-Capable Transport',
+                'CWR': 'TCP Congestion Window Reduced',
+                'CE': 'TCP Congestion Experienced',
+                'DF': "Don't fragment",
+                }
+
     _MAC_special = {'multicast': '01:00:5e'}
 
     def __init__(self, line, protocols=None, services=None, aliases=None, *args, **kwargs):
@@ -59,6 +72,8 @@ class NetFilterLogLine:
 
         pre_in = self.raw_line.split("IN=")[0]
         self._parse_pre_in(pre_in)
+
+        self.parse_flags()
 
         # Parse the packet based on the parameters
         for param in self.NF_Parameters.keys():
@@ -95,6 +110,18 @@ class NetFilterLogLine:
                 else:
                     self.logger.warning("Unable to find parameter: %s" % param)
                     setattr(self, param, None)
+
+    def parse_flags(self):
+        """
+        Parses netfilter flags from self.raw_line
+        """
+        self.logger.debug("Parsing flags: %s" % self.raw_line)
+        for flag in self.NF_Flags.keys():
+            flag_re = r'\s%s[\s|$]' % flag
+            if re.search(flag_re, self.raw_line):
+                setattr(self, flag, True)
+            else:
+                setattr(self, flag, False)
 
     def _parse_mac(self, mac):
         """
@@ -175,7 +202,13 @@ class NetFilterLogLine:
         dst_port_alias = self._display_port(self.DPT, self.PROTO)
         dst_str = f"<{dst_mac_alias}> {dst_ip_alias}:{dst_port_alias} ".ljust(46, ' ')
 
-        return f"[{self.timestamp}] {log_type} {self.hostname}: {src_str} {proto_str} {dst_str}"
+        flags = ""
+
+        for flag in self.NF_Flags.keys():
+            if getattr(self, flag):
+                flags += f"{self.NF_Flags[flag]} "
+
+        return f"[{self.timestamp}] {log_type} {self.hostname}: {src_str} {proto_str} {dst_str} <{flags}>"
 
 
 @add_thread('watch', 'watch_logs', 'Thread for reading the log file')
