@@ -206,7 +206,8 @@ class NetFilterLogLine:
 
         for flag in self.NF_Flags.keys():
             if getattr(self, flag):
-                flags += f"{self.NF_Flags[flag]} "
+                flags += f"{self.NF_Flags[flag]}, "
+        flags = flags.rstrip(" ,")
 
         return f"[{self.timestamp}] {log_type} {self.hostname}: {src_str} {proto_str} {dst_str} <{flags}>"
 
