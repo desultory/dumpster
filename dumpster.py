@@ -193,14 +193,14 @@ class NetFilterLogLine:
         src_mac_alias = self._display_mac(self.SRC_MAC)
         src_ip_alias = self._display_ip(self.SRC)
         src_port_alias = self._display_port(self.SPT, self.PROTO)
-        src_str = f"<{src_mac_alias}> {src_ip_alias}:{src_port_alias} ".ljust(46, ' ')
+        src_str = f"({src_mac_alias}) {src_ip_alias}:{src_port_alias} ".ljust(46, ' ')
 
         proto_str = f"-{self.PROTO}->".ljust(8, ' ')
 
         dst_mac_alias = self._display_mac(self.DST_MAC)
         dst_ip_alias = self._display_ip(self.DST)
         dst_port_alias = self._display_port(self.DPT, self.PROTO)
-        dst_str = f"<{dst_mac_alias}> {dst_ip_alias}:{dst_port_alias} ".ljust(46, ' ')
+        dst_str = f"({dst_mac_alias}) {dst_ip_alias}:{dst_port_alias} ".ljust(46, ' ')
 
         flags = ""
 
