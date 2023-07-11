@@ -1,0 +1,11 @@
+[aliases]
+mac_name = { "aa:bb:cc:dd:ee:Ff" = "WAN", "00:11:22:33:44:55" = "ISP", "11:aa:22:bb:33:cc" = "Desktop.lan" }
+ip_name = { "1.2.3.4" = "MyPublic", "10.10.10.2" = "MyDesktop" }
+
+[source_files]
+service_file = "/etc/services"
+protocol_file = "/etc/protocols"
+
+[log_files]
+test_file = "test.log"
+test_file2 = "/var/log/messages"
