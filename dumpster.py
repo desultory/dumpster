@@ -3,6 +3,7 @@ Dumpster reads netfilter logs, parses them, and then acts on them.
 
 """
 
+__version__ = "0.0.1"
 
 from zen_custom import class_logger, threaded, thread_wrapped, add_thread
 from queue import Queue
@@ -186,9 +187,9 @@ class NetfilterLogReader:
         self.config_file = config_file
         self.read_config()
         # Get the protocol config from the protocol file
-        self.protocols = ProtocolParser(self.config['source_files'].get('protocol_file', '/etc/protocols'), logger=self.logger).protocols
+        self.protocols = ProtocolParser(self.config['source_files'].get('protocol_file'), logger=self.logger).protocols
         # Get the service config from the service file
-        self.services = ServiceParser(self.config['source_files'].get('service_file', '/etc/services'), logger=self.logger).services
+        self.services = ServiceParser(self.config['source_files'].get('service_file'), logger=self.logger).services
 
         self.log_items = Queue()
 

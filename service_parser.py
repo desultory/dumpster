@@ -5,6 +5,8 @@ Each line contains the service name, then the port and protocol type like:
     http            80/tcp          www     # WorldWideWeb HTTP
 """
 
+__version__ = "0.0.1"
+
 from zen_custom import class_logger
 
 

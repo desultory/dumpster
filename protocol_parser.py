@@ -4,6 +4,8 @@ This is typically located at /etc/protocols.
 Each line contains the protocol name, protocol number, and protocol aliases separated by whitespace.
 """
 
+__version__ = "0.0.1"
+
 from zen_custom import class_logger
 
 
