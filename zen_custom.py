@@ -1,7 +1,7 @@
 """
 A collection of classes and decorators
 """
-__version__ = '2.4.0'
+__version__ = '2.5.0'
 __author__ = 'desultory'
 
 import logging
@@ -169,7 +169,7 @@ def class_logger(cls):
 
             if not has_handler(self.logger):
                 color_stream_handler = logging.StreamHandler()
-                color_stream_handler.setFormatter(ColorLognameFormatter())
+                color_stream_handler.setFormatter(ColorLognameFormatter(fmt='%(levelname)s | %(name)-42s | %(message)s'))
                 self.logger.addHandler(color_stream_handler)
                 self.logger.info("Adding default handler: %s" % self.logger)
 
