@@ -6,11 +6,11 @@ import logging
 
 if __name__ == '__main__':
     logger = logging.getLogger()
-    logger.setLevel(20)
+    logfile_handler = logging.FileHandler('dumpster.log')
+    logfile_handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)-8s | %(name)-42s | %(message)s'))
+    logger.addHandler(logfile_handler)
+    logger.setLevel(logging.DEBUG)
 
-    dumpster = Dumpster()
-    try:
-        dumpster.cmdloop()
-    except KeyboardInterrupt:
-        dumpster.do_stop('')
-        logger.info('Dumpster stopped')
+    dumpster = Dumpster(logger=logger)
+    dumpster.run()
+

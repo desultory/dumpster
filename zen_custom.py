@@ -1,7 +1,7 @@
 """
 A collection of classes and decorators
 """
-__version__ = '2.5.0'
+__version__ = '2.5.5'
 __author__ = 'desultory'
 
 import logging
@@ -114,16 +114,24 @@ def add_thread(name, target, description=None):
 
         def stop_thread(self):
             thread = self.threads[name]
-            getattr(self, f"_stop_processing_{name}").set()
+            dont_join = False
             if not thread._started.is_set() or thread._is_stopped:
                 self.logger.warning("Thread is not active: %s" % name)
-            else:
-                if hasattr(self, f"stop_{name}_thread_actions"):
-                    self.logger.debug("Calling: %s" % f"stop_{name}_thread_actions")
-                    getattr(self, f"stop_{name}_thread_actions")()
-                if hasattr(self, f"_{name}_timer"):
-                    self.logger.info("Stopping the timer for thread: %s" % name)
-                    getattr(self, f"_{name}_timer").cancel()
+                dont_join = True
+
+            if hasattr(self, f"_stop_processing_{name}"):
+                self.logger.debug("Setting stop event for thread: %s" % name)
+                getattr(self, f"_stop_processing_{name}").set()
+
+            if hasattr(self, f"stop_{name}_thread_actions"):
+                self.logger.debug("Calling: %s" % f"stop_{name}_thread_actions")
+                getattr(self, f"stop_{name}_thread_actions")()
+
+            if hasattr(self, f"_{name}_timer"):
+                self.logger.info("Stopping the timer for thread: %s" % name)
+                getattr(self, f"_{name}_timer").cancel()
+
+            if not dont_join:
                 self.logger.info("Waiting on thread to end: %s" % name)
                 thread.join()
 
