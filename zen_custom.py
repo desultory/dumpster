@@ -1,7 +1,7 @@
 """
 A collection of classes and decorators
 """
-__version__ = '2.5.5'
+__version__ = '2.6.0'
 __author__ = 'desultory'
 
 import logging
@@ -106,11 +106,13 @@ def add_thread(name, target, description=None):
                 self.logger.info("Re-creating thread")
                 getattr(self, f"create_{name}_thread")()
                 thread = self.threads[name]
+
             if thread._started.is_set() and not thread._is_stopped:
                 self.logger.warning("%s thread is already started" % name)
             else:
                 self.logger.info("Starting thread: %s" % name)
                 thread.start()
+                return True
 
         def stop_thread(self):
             thread = self.threads[name]
@@ -134,6 +136,7 @@ def add_thread(name, target, description=None):
             if not dont_join:
                 self.logger.info("Waiting on thread to end: %s" % name)
                 thread.join()
+            return True
 
         setattr(cls, f"create_{name}_thread", create_thread)
         setattr(cls, f"start_{name}_thread", start_thread)

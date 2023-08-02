@@ -177,6 +177,30 @@ class NetFilterLogLine:
 
         return ip
 
+    def display_src_ip(self):
+        """ Returns a string representation of the source IP"""
+        return self._display_ip(self.SRC)
+
+    def display_dst_ip(self):
+        """ Returns a string representation of the destination IP"""
+        return self._display_ip(self.DST)
+
+    def display_src_mac(self):
+        """ Returns a string representation of the source MAC"""
+        return self._display_mac(self.SRC_MAC)
+
+    def display_dst_mac(self):
+        """ Returns a string representation of the destination MAC"""
+        return self._display_mac(self.DST_MAC)
+
+    def display_src_port(self):
+        """ Returns a string representation of the source port"""
+        return self._display_port(self.SPT, self.PROTO)
+
+    def display_dst_port(self):
+        """ Returns a string representation of the destination port"""
+        return self._display_port(self.DPT, self.PROTO)
+
     def _display_port(self, port, proto):
         """
         Formats a port to be displayed.
