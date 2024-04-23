@@ -6,10 +6,10 @@ Each line contains the protocol name, protocol number, and protocol aliases sepa
 
 __version__ = "0.0.1"
 
-from zen_custom import class_logger
+from zenlib.logging import loggify
 
 
-@class_logger
+@loggify
 class ProtocolParser:
     def __init__(self, protocols_file='/etc/protocols', *args, **kwargs):
         self.protocols_file = protocols_file
@@ -30,6 +30,7 @@ class ProtocolParser:
                     continue
                 protocol_name = line.split()[0]
                 protocol_number = line.split()[1]
+                self.logger.debug("Adding protocol %s with number %s", protocol_name, protocol_number)
                 self.protocols[protocol_number] = protocol_name
 
     def __str__(self):

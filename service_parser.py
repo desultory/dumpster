@@ -7,10 +7,11 @@ Each line contains the service name, then the port and protocol type like:
 
 __version__ = "0.0.1"
 
-from zen_custom import class_logger
+
+from zenlib.logging import loggify
 
 
-@class_logger
+@loggify
 class ServiceParser:
     def __init__(self, service_file='/etc/services', *args, **kwargs):
         self.service_file = service_file
@@ -36,6 +37,7 @@ class ServiceParser:
                 protocol = line.split()[1].split('/')[1]
                 if protocol not in self.services:
                     self.services[protocol] = {}
+                self.logger.debug("Adding service: %s %s/%s", service, port, protocol)
                 self.services[protocol][port] = service.lower()
 
     def __str__(self):

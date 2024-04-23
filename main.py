@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
 from dumpster import Dumpster
-import logging
+from zenlib.util import get_kwargs
+from asyncio import run
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger()
-    logfile_handler = logging.FileHandler('dumpster.log')
-    logfile_handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)-8s | %(name)-42s | %(message)s'))
-    logger.addHandler(logfile_handler)
-    logger.setLevel(10)
+    kwargs = get_kwargs(package='dumpster', description="NFTables log parser")
 
-    dumpster = Dumpster(logger=logger)
-    dumpster.run()
+    dumpster = Dumpster(**kwargs)
+    run(dumpster.run())
 

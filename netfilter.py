@@ -5,10 +5,10 @@ Dumpster reads netfilter logs, parses them, and then acts on them.
 
 __version__ = "0.0.3"
 
-from zen_custom import class_logger, threaded, thread_wrapped, add_thread
+from zenlib.logging import loggify
 from queue import Queue
 from signal import signal, SIGUSR1
-from time import sleep
+from asyncio import sleep
 from os.path import isfile, exists
 from protocol_parser import ProtocolParser
 from service_parser import ServiceParser
@@ -17,7 +17,7 @@ import tomllib
 import re
 
 
-@class_logger
+@loggify
 class NetFilterLogLine:
     """Parses a Netfilter log line"""
     NF_Parameters = {'IN': 'Input interface',
@@ -236,8 +236,7 @@ class NetFilterLogLine:
         return f"[{self.timestamp}] {log_type} {self.hostname}: {src_str} {proto_str} {dst_str} <{flags}>"
 
 
-@add_thread('watch', 'watch_logs', 'Thread for reading the log file')
-@class_logger
+@loggify
 class NetfilterLogReader:
     """Reads Netfilter logs, parses into a Queue"""
     def __init__(self, config_file='config.toml', *args, **kwargs):
@@ -251,51 +250,42 @@ class NetfilterLogReader:
 
         self.log_items = Queue()
 
+    def run(self):
+        from asyncio import get_event_loop
+        get_event_loop().run_until_complete(self.watch_logs())
+
     def read_config(self):
-        """
-        Reads the config file.
-        """
+        """ Reads the config file. """
         self.logger.info("Reading config file: %s" % self.config_file)
         with open(self.config_file, 'rb') as f:
             self.config = tomllib.load(f)
         self.log_files = self.config['log_files']
 
-    @thread_wrapped('watch')
     def watch_logs(self):
         """Watches the log files"""
-        for log_file in self.log_files.values():
-            self._watch_log(log_file)
+        from asyncio import create_task
+        [create_task(self.watch_log(log_file)) for log_file in self.log_files.values()]
 
-        # Wait for log threads to join before restarting
-        for thread, exception in self._threads:
-            thread.join()
-            while not exception.empty():
-                self.logger.error(exception.get())
-
-    @threaded
-    def _watch_log(self, log_file):
+    async def watch_log(self, log_file):
         """Reads the log file, parses it, and puts it in the queue"""
         if not exists(log_file) or not isfile(log_file):
-            self.logger.error("Log file does not exist: %s" % log_file)
-            return
+            raise FileNotFoundError("Log file does not exist: %s" % log_file)
 
         with open(log_file, 'r') as f:
             self.logger.info("Watching log file: %s" % f.name)
-            while not self._stop_processing_watch.is_set():
-                line = f.readline()
-                if line:
+            while True:
+                if line := f.readline():
                     try:
-                        log_item = NetFilterLogLine(line, protocols=self.protocols, services=self.services, aliases=self.config['aliases'], logger=self.logger, _log_init=False)
+                        log_item = NetFilterLogLine(line, protocols=self.protocols, services=self.services, aliases=self.config['aliases'],
+                                                    logger=self.logger, _log_init=False)
                         self.log_items.put(log_item)
                         self.logger.debug("Added log line to queue: %s" % log_item)
                     except ValueError as e:
                         self.logger.error(e)
                 else:
-                    sleep(0.5)
+                    await sleep(0.1)
         self.logger.info("Closed log file: %s" % log_file)
 
     def _reload_files(self, *args, **kwargs):
         """ Reloads watched log files """
         self.logger.info("Detected reload signal, reloading config file")
-        self.stop_watch_thread()
-        self.start_watch_thread()
