@@ -4,7 +4,7 @@ This is typically located at /etc/protocols.
 Each line contains the protocol name, protocol number, and protocol aliases separated by whitespace.
 """
 
-__version__ = "0.0.1"
+__version__ = "1.0.0"
 
 from zenlib.logging import loggify
 
@@ -17,10 +17,8 @@ class ProtocolParser:
         self.parse_protocols_file()
 
     def parse_protocols_file(self):
-        """
-        Parses the protocols file and stores the results in a dictionary
-        where each key is the protocol number, and the value is the protocol alias
-        """
+        """ Parses the protocols file and stores the results in the self.protocols dict.
+        The dict keys are the protocol numbers, and the values are the protocol aliases. """
         with open(self.protocols_file, 'r') as f:
             for line in f:
                 if line.startswith('#'):
@@ -34,10 +32,6 @@ class ProtocolParser:
                 self.protocols[protocol_number] = protocol_name
 
     def __str__(self):
-        """
-        Outputs the protocols dictionary as a string, formatted like:
-            Protocol number: protocol alias
-        """
         out_str = ''
         for protocol_number, protocol_aliases in self.protocols.items():
             out_str += f'{protocol_number}: {protocol_aliases}\n'

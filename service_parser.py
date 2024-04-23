@@ -5,7 +5,7 @@ Each line contains the service name, then the port and protocol type like:
     http            80/tcp          www     # WorldWideWeb HTTP
 """
 
-__version__ = "0.0.1"
+__version__ = "1.0.0"
 
 
 from zenlib.logging import loggify
@@ -19,12 +19,10 @@ class ServiceParser:
         self.parse_service_file()
 
     def parse_service_file(self):
-        """
-        Parses the service file and stores the results in self.services
-        where each key is the protocol, which contains another dictionary where the key is the port
-        and the value is the service name.
-        Service names are all lower case.
-        """
+        """ Parses the service file and stores the results in the self.services dict.
+        The key name is the protocol, which contians a dict with:
+            key: port
+            value: service name (lowercase)"""
         with open(self.service_file, 'r') as f:
             for line in f:
                 if line.startswith('#'):
@@ -41,10 +39,6 @@ class ServiceParser:
                 self.services[protocol][port] = service.lower()
 
     def __str__(self):
-        """
-        Returns a string representation of the services dict like:
-            {service}\t\t{port}/{protocol}
-        """
         out_str = ''
         for protocol, values in self.services.items():
             for port, service in values.items():
