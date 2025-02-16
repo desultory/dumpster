@@ -200,11 +200,11 @@ class DumpsterRules:
         try:
             self.add_to_set("dumpster_blackhole", ip)
             self.logger.info(f"Blackholed IP: {colorize(ip, 'red')}")
-        except NFTSetItemExists:
+        except NFTSetItemExists as e:
             self.logger.info(f"Updating blackholed IP: {colorize(ip, 'red')}")
-            self.add_to_set("dumpster_blackhole_alt", ip)
+            self.add_to_set("dumpster_blackhole_alt", ip, exist_ok=True)
             self.remove_from_set("dumpster_blackhole", ip)
-            self.add_to_set("dumpster_blackhole", ip)
+            self.add_to_set("dumpster_blackhole", ip, timeout=e.expires + 15 * 60)
             self.remove_from_set("dumpster_blackhole_alt", ip)
 
     @get_default_args
@@ -215,13 +215,19 @@ class DumpsterRules:
         self.logger.debug(f"[{family}:{table}:{set_name}] Element removed from set: {colorize(element, 'red')}")
 
     @get_default_args
-    def add_to_set(self, set_name, element, table=None, family=None):
+    def add_to_set(self, set_name, element, table=None, family=None, timeout=None, exist_ok=False):
         set_items = self.get_set_elements(set_name, table, family)
         if element in set_items:
-            raise NFTSetItemExists(
-                f"[{family}:{table}:{set_name}] Element already in set: {colorize(element, 'yellow')}"
-            )
-        self.run_cmd(f"add element {family} {table} {set_name} {{{element}}}")
+            if exist_ok:
+                return self.logger.warning(f"[{family}:{table}:{set_name}] Element already exists in set: {element}")
+            raise NFTSetItemExists(set_name, element, set_items[element])
+        if timeout:
+            if isinstance(timeout, int):
+                timeout = f"{timeout}s"
+            cmd = f"add element {family} {table} {set_name} {{{element} timeout {timeout}}}"
+        else:
+            cmd = f"add element {family} {table} {set_name} {{{element}}}"
+        self.run_cmd(cmd)
         self.logger.debug(f"[{family}:{table}:{set_name}] Element added to set: {colorize(element, 'green')}")
 
     @get_default_args
@@ -230,8 +236,18 @@ class DumpsterRules:
             return self.logger.warning(f"[{family}:{table}] Set does not exist: {set_name}")
         set_info = self.run_cmd(f"list set {family} {table} {set_name}")[0]["set"]
         if "elem" not in set_info:
-            return []
-        return [elem["val"] for elem in set_info["elem"] for elem_type, elem in elem.items() if elem_type == "elem"]
+            return {}
+        elements = {}
+        for elem in set_info["elem"]:
+            if isinstance(elem, dict):
+                for element_type, data in elem.items():
+                    if element_type != "elem":
+                        self.logger.warning(f"[{family}:{table}:{set_name}] Non-elemnt type found in set: {elem}")
+                        continue
+                    elements[data["val"]] = data.get("expires")
+            else:
+                elements[elem] = None
+        return elements
 
     @get_default_args
     def get_sets(self, table=None, family=None):
