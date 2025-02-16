@@ -201,7 +201,7 @@ class DumpsterRules:
             self.add_to_set("dumpster_blackhole", ip)
             self.logger.info(f"Blackholed IP: {colorize(ip, 'red')}")
         except NFTSetItemExists as e:
-            self.logger.info(f"Updating blackholed IP: {colorize(ip, 'red')}")
+            self.logger.info(f"[{colorize(e.expires, "yellow")}s] Updating blackholed IP: {colorize(ip, 'red')}")
             self.add_to_set("dumpster_blackhole_alt", ip, exist_ok=True)
             self.remove_from_set("dumpster_blackhole", ip)
             self.add_to_set("dumpster_blackhole", ip, timeout=e.expires + 15 * 60)
