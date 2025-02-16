@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dumpster"
+version = "0.0.1"
+authors = [
+  { name="Desultory", email="dev@pyl.onl" },
+]
+description = "NFT log dump thing."
+readme = "readme.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "zenlib >= 3.1.0",
+]
+
+[project.scripts]
+dumpster = "dumpster.main:main"
+
+[project.urls]
+Homepage = "https://github.com/desultory/dumpster"
+Issues = "https://github.com/desultory/dumpster/issues"
