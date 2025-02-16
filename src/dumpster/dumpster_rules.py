@@ -194,7 +194,7 @@ class DumpsterRules:
                 )
 
         self.run_cmd({"nftables": [{"add": {"rule": args}}]})
-        self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {rule}")
+        self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {colorize(args, "green")}")
 
     def blackhole(self, ip):
         try:
