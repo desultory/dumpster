@@ -5,6 +5,7 @@ from json import loads
 
 from nftables import Nftables
 from zenlib.logging import loggify
+from zenlib.util import colorize
 
 from .errors import NFTError, NFTSetItemExists
 
@@ -91,7 +92,7 @@ class DumpsterRules:
         self.init_nftables()
 
     def init_nftables(self):
-        """ Initializes the dumpster table and chains """
+        """Initializes the dumpster table and chains"""
         self.add_table()
         for chain_name, chain_args in DUMPSTER_CHAINS.items():
             self.add_chain(chain_name, **chain_args)
@@ -130,7 +131,6 @@ class DumpsterRules:
             chain_name="input",
             comment="Backup chain for blackhole rotation,",
         )
-
 
     @property
     def ruleset(self):
@@ -189,17 +189,19 @@ class DumpsterRules:
         for rule in self.get_rules(family, table, chain_name).values():
             # Checks if the match (first arg of the expression) is already in the chain
             if rule["expr"][0] == expression[0]:
-                return self.logger.warning(f"[{family}:{table}:{chain_name}] Rule already exists in: {rule}")
+                return self.logger.warning(
+                    f"[{family}:{table}:{chain_name}] Rule already exists in: {colorize(rule, 'yellow')}"
+                )
 
         self.run_cmd({"nftables": [{"add": {"rule": args}}]})
-        self.logger.info(f"[{self.dumpster_family}:{self.dumpster_table}] Rule added to {chain_name}")
+        self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {rule}")
 
     def blackhole(self, ip):
         try:
-            self.logger.info(f"Blackholing IP: {ip}")
             self.add_to_set("dumpster_blackhole", ip)
+            self.logger.info(f"Blackholed IP: {colorize(ip, 'red')}")
         except NFTSetItemExists:
-            self.logger.warning(f"Updating blackholed IP: {ip}")
+            self.logger.info(f"Updating blackholed IP: {colorize(ip, 'red')}")
             self.add_to_set("dumpster_blackhole_alt", ip)
             self.remove_from_set("dumpster_blackhole", ip)
             self.add_to_set("dumpster_blackhole", ip)
@@ -208,17 +210,19 @@ class DumpsterRules:
     @get_default_args
     def remove_from_set(self, set_name, element, table=None, family=None):
         if set_name not in self.get_sets(table, family):
-            return self.logger.warning(f"[{family}:{table}] Set does not exist: {set_name}")
+            return self.logger.warning(f"[{family}:{table}] Set does not exist: {colorize(set_name, 'yellow')}")
         self.run_cmd(f"destroy element {family} {table} {set_name} {{{element}}}")
-        self.logger.info(f"[{family}:{table}:{set_name}] Element removed from set: {element}")
+        self.logger.debug(f"[{family}:{table}:{set_name}] Element removed from set: {colorize(element, 'red')}")
 
     @get_default_args
     def add_to_set(self, set_name, element, table=None, family=None):
         set_items = self.get_set_elements(set_name, table, family)
         if element in set_items:
-            raise NFTSetItemExists(f"[{family}:{table}:{set_name}] Element already in set: {element}")
+            raise NFTSetItemExists(
+                f"[{family}:{table}:{set_name}] Element already in set: {colorize(element, 'yellow')}"
+            )
         self.run_cmd(f"add element {family} {table} {set_name} {{{element}}}")
-        self.logger.info(f"[{family}:{table}:{set_name}] Element added to set: {element}")
+        self.logger.debug(f"[{family}:{table}:{set_name}] Element added to set: {colorize(element, 'green')}")
 
     @get_default_args
     def get_set_elements(self, set_name, table=None, family=None):
@@ -242,7 +246,7 @@ class DumpsterRules:
             if value := kwargs.pop(opt_arg.name, None):
                 args[opt_arg.value] = value
         if kwargs:
-            self.logger.warning(f"[{family}:{table}] Unused set options: {kwargs}")
+            self.logger.warning(f"[{family}:{table}] Unused set options: {colorize(kwargs, "red")}")
         self.run_cmd({"nftables": [{"add": {"set": args}}]})
         self.logger.info(f"[{family}:{table}] Set created: {set_name}")
 
@@ -258,17 +262,17 @@ class DumpsterRules:
                 args[opt_arg.value] = value
 
         if self.chains.get(chain_name):
-            return self.logger.warning(f"[{family}:{table}] Chain already exists: {chain_name}")
+            return self.logger.warning(f"[{family}:{table}] Chain already exists: {colorize(chain_name, "yellow")}")
 
         self.run_cmd({"nftables": [{"add": {"chain": args}}]})
-        self.logger.info(f"[{family}:{table}] Chain created: {chain_name}")
+        self.logger.info(f"[{family}:{table}] Chain created: {colorize(chain_name, "green")}")
 
     @get_default_args
     def add_table(self, table=None, family=None):
         if self.tables.get(family, {}).get(table):
-            return self.logger.warning(f"[{family}] Table already exists: {table}")
+            return self.logger.warning(f"[{family}] Table already exists: {colorize(table, "yellow")}")
         self.run_cmd(f"add table {family} {table}")
-        self.logger.info(f"[{family}] Table created: {table}")
+        self.logger.info(f"[{family}] Table created: {colorize(table, "green")}")
 
     def run_cmd(self, cmd):
         if isinstance(cmd, dict):

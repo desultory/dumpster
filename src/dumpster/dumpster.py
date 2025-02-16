@@ -8,6 +8,7 @@ from asyncio import create_task, sleep
 from tomllib import load
 
 from zenlib.logging import loggify
+from zenlib.util import colorize
 
 from .nft_log_reader import NetfilterLogReader
 from .nft_line import NetFilterLogLine
@@ -46,13 +47,13 @@ class Dumpster:
             self.db.insert_logline(log_item)
         except LogLineExists as e:
             return self.logger.warning(e)
-        self.logger.info("[%s] %s:%s -> %s:%s", log_item.log_type.name,
+        recent_drops = len(self.db.get_from_ip(log_item.SRC))
+        self.logger.info("[%s(%s)] %s:%s -> %s:%s", log_item.log_type.name, colorize(recent_drops, "red"),
                          log_item.SRC, log_item.SPT,
                          log_item.DST, log_item.DPT)
         if log_item.log_type.name != "INBOUND":
             return
-        if len(self.db.get_from_ip(log_item.SRC)) > 2:
-            self.logger.warning("Too many connections from %s", log_item.SRC)
+        if recent_drops > 2:
             self.nft.blackhole(log_item.SRC)
 
     async def process_log_queue(self):
