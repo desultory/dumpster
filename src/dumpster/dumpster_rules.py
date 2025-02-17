@@ -84,11 +84,12 @@ def get_default_args(method):
 
 @loggify
 class DumpsterRules:
-    def __init__(self, dumpster_table="dumpster", dumpster_family="inet", *args, **kwargs):
+    def __init__(self, dumpster_table="dumpster", dumpster_family="inet", blackhole_timeout=300, *args, **kwargs):
         self.nft = Nftables()
         self.nft.set_json_output(1)
         self.dumpster_table = dumpster_table
         self.dumpster_family = dumpster_family
+        self.blackhole_timeout = blackhole_timeout
         self.init_nftables()
 
     def init_nftables(self):
@@ -96,7 +97,7 @@ class DumpsterRules:
         self.add_table()
         for chain_name, chain_args in DUMPSTER_CHAINS.items():
             self.add_chain(chain_name, **chain_args)
-        self.add_set("dumpster_blackhole", timeout=15 * 60, comment="15 minute timeout")
+        self.add_set("dumpster_blackhole", timeout=self.blackhole_timeout)
         self.add_set("dumpster_blackhole_alt", comment="Blackhole backup")
         self.add_rule(
             [
@@ -112,7 +113,7 @@ class DumpsterRules:
                 {"drop": None},
             ],
             chain_name="input",
-            comment="Blackhole IPs for 15 minutes",
+            comment="Blackhole IPs teporarily",
         )
 
         self.add_rule(
@@ -196,15 +197,22 @@ class DumpsterRules:
         self.run_cmd({"nftables": [{"add": {"rule": args}}]})
         self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {colorize(args, 'green')}")
 
-    def blackhole(self, ip):
+    def blackhole(self, ip, timeout=None):
+        timeout = timeout or self.blackhole_timeout
         try:
-            self.add_to_set("dumpster_blackhole", ip)
-            self.logger.info(f"Blackholed IP: {colorize(ip, 'red')}")
+            if timeout == self.blackhole_timeout:
+                self.add_to_set("dumpster_blackhole", ip)
+            else:  # If it uses the default timeout, don't specify it
+                self.add_to_set("dumpster_blackhole", ip, timeout=timeout)
+            self.logger.info(f"[{colorize(timeout, "blue")}] Blackholed IP: {colorize(ip, 'red')}")
         except NFTSetItemExists as e:
-            self.logger.info(f"[{colorize(e.expires, 'yellow')}s] Updating blackholed IP: {colorize(ip, 'red')}")
+            timeout = e.expires + timeout  # Extend the timeout
+            self.logger.info(f"[{colorize(timeout, 'blue')}s] Updating blackholed IP: {colorize(ip, 'red')}")
+            # Add to a backup set, so it is blocked while extending
             self.add_to_set("dumpster_blackhole_alt", ip, exist_ok=True)
             self.remove_from_set("dumpster_blackhole", ip)
-            self.add_to_set("dumpster_blackhole", ip, timeout=e.expires + 15 * 60)
+            # Add the IP back to the main set with the new timeout
+            self.add_to_set("dumpster_blackhole", ip, timeout=timeout)
             self.remove_from_set("dumpster_blackhole_alt", ip)
 
     @get_default_args
