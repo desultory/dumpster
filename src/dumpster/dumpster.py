@@ -85,8 +85,14 @@ class Dumpster:
         )
         if log_item.log_type.name != "INBOUND":
             return
-        if recent_drops >= self.repeat_count:
+        if self.db.is_blackholed(log_item.SRC):
+            # If it's already blackholed, and droppped again, extend the timeout
             self.nft.blackhole(log_item.SRC, self.blackhole_timeout)
+        elif recent_drops >= self.repeat_count:
+            # If it's a new offender, and has been dropped enough times, blackhole it
+            self.nft.blackhole(log_item.SRC, self.blackhole_timeout)
+            self.db.insert_blackhole(log_item.SRC)
+
         if not self._started.is_set():
             self._started.set()
             self.logger.info("Processed initial log items.")

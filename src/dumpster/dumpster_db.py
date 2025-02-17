@@ -3,6 +3,7 @@ from time import time
 from asyncio import Event
 
 from zenlib.logging import loggify
+from zenlib.util import colorize
 
 from .errors import LogLineExists
 
@@ -37,6 +38,7 @@ class DumpsterDB:
             );
             """
         )
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS blackhole (ip TEXT PRIMARY KEY, time TEXT);")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS invalid (logline TEXT PRIMARY KEY, time TEXT);")
         self.conn.commit()
 
@@ -75,6 +77,17 @@ class DumpsterDB:
                 logline.line,
             ),
         )
+        self.uncommitted_writes.set()
+
+    def is_blackholed(self, ip):
+        return bool(self.cursor.execute("SELECT * FROM blackhole WHERE ip = ?;", (ip,)).fetchone())
+
+    def insert_blackhole(self, ip):
+        """ Adds a blackholed IP to the database, if it doesn't already exist """
+        if self.is_blackholed(ip):
+            return self.logger.debug(f"Blackhole IP already exists in database: {colorize(ip, 'yellow')}")
+        self.logger.info(f"Adding blackhole IP to database: {colorize(ip, 'red')}")
+        self.cursor.execute("INSERT INTO blackhole VALUES (?, ?);", (ip, time()))
         self.uncommitted_writes.set()
 
     def commit(self):
