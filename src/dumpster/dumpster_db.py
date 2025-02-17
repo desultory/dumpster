@@ -39,6 +39,7 @@ class DumpsterDB:
             """
         )
         self.cursor.execute("CREATE TABLE IF NOT EXISTS blackhole (ip TEXT PRIMARY KEY, time TEXT);")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS bad_ip (ip TEXT PRIMARY KEY, time TEXT);")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS invalid (logline TEXT PRIMARY KEY, time TEXT);")
         self.conn.commit()
 
@@ -77,6 +78,17 @@ class DumpsterDB:
                 logline.line,
             ),
         )
+        self.uncommitted_writes.set()
+
+    def is_bad_ip(self, ip):
+        return bool(self.cursor.execute("SELECT * FROM bad_ip WHERE ip = ?;", (ip,)).fetchone())
+
+    def insert_bad_ip(self, ip):
+        """ Adds a bad IP to the database, if it doesn't already exist """
+        if self.is_bad_ip(ip):
+            return self.logger.debug(f"Bad IP already exists in database: {colorize(ip, 'yellow')}")
+        self.logger.info(f"Adding bad IP to database: {colorize(ip, 'red')}")
+        self.cursor.execute("INSERT INTO bad_ip VALUES (?, ?);", (ip, time()))
         self.uncommitted_writes.set()
 
     def is_blackholed(self, ip):

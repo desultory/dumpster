@@ -19,6 +19,7 @@ from .nft_log_reader import NetfilterLogReader
 DEFAULT_REPEAT_PERIOD = 300  # track blocked IPs for 5 minutes
 DEFAULT_REPEAT_COUNT = 3  # block IPs that have been blocked 3 times in the repeat period
 DEFAULT_BLACKHOLE_TIMEOUT = 900  # block IPs for 15 minutes
+DEFAULT_BAD_IP_THRESHOLD = 25  # block IPs that have been blocked 25 times in the repeat period
 DEFAULT_SCAN_DIRECTIONS = ["INBOUND"]
 
 
@@ -30,6 +31,7 @@ class Dumpster:
         repeat_period=DEFAULT_REPEAT_PERIOD,
         repeat_count=DEFAULT_REPEAT_COUNT,
         blackhole_timeout=DEFAULT_BLACKHOLE_TIMEOUT,
+        bad_ip_threshold=DEFAULT_BAD_IP_THRESHOLD,
         scan_directions=DEFAULT_SCAN_DIRECTIONS,
         *args,
         **kwargs,
@@ -37,6 +39,7 @@ class Dumpster:
         self.log_readers = {}
         self.repeat_period = repeat_period
         self.repeat_count = repeat_count
+        self.bad_ip_threshold = bad_ip_threshold
         self.blackhole_timeout = blackhole_timeout
         self.scan_directions = scan_directions
         self.load_config(config_file)
@@ -54,14 +57,10 @@ class Dumpster:
 
         self.config["db_file"] = self.config.get("db_file", "dumpster.sqlite")
 
-        if scan_directions := self.config.get("scan_directions"):
-            self.scan_directions = scan_directions
-        if repeat_period := self.config.get("repeat_period"):
-            self.repeat_period = repeat_period
-        if repeat_count := self.config.get("repeat_count"):
-            self.repeat_count = repeat_count
-        if blackhole_timeout := self.config.get("blackhole_timeout"):
-            self.blackhole_timeout = blackhole_timeout
+        for attr in ["repeat_period", "repeat_count", "blackhole_timeout", "scan_directions", "bad_ip_threshold"]:
+            if value := self.config.get(attr):
+                self.logger.info(f"[{attr}] Setting from config: {value}")
+                setattr(self, attr, value)
 
     async def run(self):
         for log_reader in self.log_readers.values():
@@ -88,13 +87,19 @@ class Dumpster:
             log_item.DST,
             log_item.DPT,
         )
-        if self.db.is_blackholed(log_item.SRC):
+        if recent_drops >= self.bad_ip_threshold:
+            self.logger.warning("Permanently blocking: %s", colorize(log_item.SRC, "red"))
+            self.nft.block(log_item.SRC)
+            self.db.insert_bad_ip(log_item.SRC)
+        elif self.db.is_blackholed(log_item.SRC):
             # If it's already blackholed, and droppped again, extend the timeout
             self.nft.blackhole(log_item.SRC, self.blackhole_timeout)
         elif log_item.log_type.name in self.scan_directions and recent_drops >= self.repeat_count:
             # If it's a new offender, and has been dropped enough times, blackhole it
             self.nft.blackhole(log_item.SRC, self.blackhole_timeout)
             self.db.insert_blackhole(log_item.SRC)
+        else:
+            self.logger.debug("Allowing: %s", log_item)
 
         if not self._started.is_set():
             self._started.set()

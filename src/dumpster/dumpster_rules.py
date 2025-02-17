@@ -98,9 +98,26 @@ class DumpsterRules:
         self.add_table()
         for chain_name, chain_args in DUMPSTER_CHAINS.items():
             self.add_chain(chain_name, **chain_args)
+        self.add_set("dumpster_bad_ips", comment="Bad IPs")
         self.add_set("dumpster_blackhole", timeout=self.blackhole_timeout)
         self.add_set("dumpster_blackhole_alt", comment="Blackhole backup")
         for chain in ["input", "forward"]:
+            self.add_rule(
+                [
+                    {
+                        "match": {
+                            "op": "==",
+                            "left": {"payload": {"protocol": "ip", "field": "saddr"}},
+                            "right": "@dumpster_bad_ips",
+                        }
+                    },
+                    {"counter": None},
+                    {"log": {"prefix": "Dumpster Blocked: "}},
+                    {"drop": None},
+                ],
+                chain_name=chain,
+                comment="Permanently block bad IPs",
+            )
             self.add_rule(
                 [
                     {
@@ -117,7 +134,6 @@ class DumpsterRules:
                 chain_name=chain,
                 comment="Blackhole IPs teporarily",
             )
-
             self.add_rule(
                 [
                     {
@@ -199,6 +215,10 @@ class DumpsterRules:
         self.run_cmd({"nftables": [{"add": {"rule": args}}]})
         self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {colorize(args, 'green')}")
 
+    def block(self, ip):
+        self.add_to_set("dumpster_bad_ips", ip, exist_ok=True)
+        self.logger.info(f"Blocked IP: {colorize(ip, 'red')}")
+
     def blackhole(self, ip, timeout=None):
         timeout = timeout or self.blackhole_timeout
         try:
@@ -277,6 +297,13 @@ class DumpsterRules:
         self.logger.info(f"[{family}:{table}] Set created: {colorize(set_name, 'green')}")
 
     @get_default_args
+    def del_chain(self, chain_name, table=None, family=None):
+        if not self.chains.get(chain_name):
+            return self.logger.warning(f"[{family}:{table}] Chain does not exist: {colorize(chain_name, 'yellow')}")
+        self.run_cmd(f"delete chain {family} {table} {chain_name}")
+        self.logger.info(f"[{family}:{table}] Chain deleted: {colorize(chain_name, 'red')}")
+
+    @get_default_args
     def add_chain(self, chain_name=None, table=None, family=None, **kwargs):
         kwargs["chain_type"] = ChainTypes.__members__[kwargs.get("type", "filter").upper()].value
         kwargs["priority"] = kwargs.get("priority", 200)
@@ -288,7 +315,8 @@ class DumpsterRules:
                 args[opt_arg.value] = value
 
         if self.chains.get(chain_name):
-            return self.logger.warning(f"[{family}:{table}] Chain already exists: {colorize(chain_name, 'yellow')}")
+            # If the chain already exists, delete it and recreate it to update the options
+            self.del_chain(chain_name, table, family)
 
         self.run_cmd({"nftables": [{"add": {"chain": args}}]})
         self.logger.info(f"[{family}:{table}] Chain created: {colorize(chain_name, 'green')}")
