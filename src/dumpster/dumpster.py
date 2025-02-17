@@ -4,7 +4,7 @@ Uses the netfilter module to parse logged packets, acts on them.
 
 __version__ = "0.1.0"
 
-from asyncio import create_task, sleep
+from asyncio import create_task, sleep, Event
 from tomllib import load
 
 from zenlib.logging import loggify
@@ -22,6 +22,7 @@ class Dumpster:
     def __init__(self, config_file="config.toml", *args, **kwargs):
         self.log_readers = {}
         self.load_config(config_file)
+        self._started = Event()
         self.db = DumpsterDB(db_path=self.config.get('db_file'), logger=self.logger)
         self.nft = DumpsterRules(logger=self.logger)
 
@@ -46,7 +47,9 @@ class Dumpster:
         try:
             self.db.insert_logline(log_item)
         except LogLineExists as e:
-            return self.logger.warning(e)
+            if self._started.is_set():
+                return self.logger.warning(e)
+            return self.logger.debug(e)
         recent_drops = len(self.db.get_from_ip(log_item.SRC))
         self.logger.info("[%s(%s)] %s:%s -> %s:%s", log_item.log_type.name, colorize(recent_drops, "red"),
                          log_item.SRC, log_item.SPT,
@@ -55,6 +58,9 @@ class Dumpster:
             return
         if recent_drops > 2:
             self.nft.blackhole(log_item.SRC)
+        if not self._started.is_set():
+            self._started.set()
+            self.logger.info("Processed initial log items.")
 
     async def process_log_queue(self):
         """Reads the items from all log_reader's log_items queue

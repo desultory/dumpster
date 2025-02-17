@@ -52,7 +52,7 @@ class DumpsterDB:
 
     def insert_logline(self, logline):
         """Checks that the hash doesn't already exist in the database before inserting"""
-        self.logger.debug(f"Checking if hash exists in database: {logline.hash}")
+        self.logger.log(5, f"Checking if hash exists in database: {logline.hash}")
         if self.cursor.execute("SELECT * FROM dumpster WHERE id = ?;", (logline.hash,)).fetchone():
             raise LogLineExists(f"Hash already exists in the database: {logline.hash}")
 

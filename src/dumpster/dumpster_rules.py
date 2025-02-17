@@ -194,14 +194,14 @@ class DumpsterRules:
                 )
 
         self.run_cmd({"nftables": [{"add": {"rule": args}}]})
-        self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {colorize(args, "green")}")
+        self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {colorize(args, 'green')}")
 
     def blackhole(self, ip):
         try:
             self.add_to_set("dumpster_blackhole", ip)
             self.logger.info(f"Blackholed IP: {colorize(ip, 'red')}")
         except NFTSetItemExists as e:
-            self.logger.info(f"[{colorize(e.expires, "yellow")}s] Updating blackholed IP: {colorize(ip, 'red')}")
+            self.logger.info(f"[{colorize(e.expires, 'yellow')}s] Updating blackholed IP: {colorize(ip, 'red')}")
             self.add_to_set("dumpster_blackhole_alt", ip, exist_ok=True)
             self.remove_from_set("dumpster_blackhole", ip)
             self.add_to_set("dumpster_blackhole", ip, timeout=e.expires + 15 * 60)
@@ -262,9 +262,9 @@ class DumpsterRules:
             if value := kwargs.pop(opt_arg.name, None):
                 args[opt_arg.value] = value
         if kwargs:
-            self.logger.warning(f"[{family}:{table}] Unused set options: {colorize(kwargs, "red")}")
+            self.logger.warning(f"[{family}:{table}] Unused set options: {colorize(kwargs, 'red')}")
         self.run_cmd({"nftables": [{"add": {"set": args}}]})
-        self.logger.info(f"[{family}:{table}] Set created: {set_name}")
+        self.logger.info(f"[{family}:{table}] Set created: {colorize(set_name, 'green')}")
 
     @get_default_args
     def add_chain(self, chain_name=None, table=None, family=None, **kwargs):
@@ -278,17 +278,17 @@ class DumpsterRules:
                 args[opt_arg.value] = value
 
         if self.chains.get(chain_name):
-            return self.logger.warning(f"[{family}:{table}] Chain already exists: {colorize(chain_name, "yellow")}")
+            return self.logger.warning(f"[{family}:{table}] Chain already exists: {colorize(chain_name, 'yellow')}")
 
         self.run_cmd({"nftables": [{"add": {"chain": args}}]})
-        self.logger.info(f"[{family}:{table}] Chain created: {colorize(chain_name, "green")}")
+        self.logger.info(f"[{family}:{table}] Chain created: {colorize(chain_name, 'green')}")
 
     @get_default_args
     def add_table(self, table=None, family=None):
         if self.tables.get(family, {}).get(table):
-            return self.logger.warning(f"[{family}] Table already exists: {colorize(table, "yellow")}")
+            return self.logger.warning(f"[{family}] Table already exists: {colorize(table, 'yellow')}")
         self.run_cmd(f"add table {family} {table}")
-        self.logger.info(f"[{family}] Table created: {colorize(table, "green")}")
+        self.logger.info(f"[{family}] Table created: {colorize(table, 'green')}")
 
     def run_cmd(self, cmd):
         if isinstance(cmd, dict):
