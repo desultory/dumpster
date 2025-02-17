@@ -38,8 +38,8 @@ class DumpsterDB:
             );
             """
         )
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS blackhole (ip TEXT PRIMARY KEY, time TEXT);")
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS bad_ip (ip TEXT PRIMARY KEY, time TEXT);")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS timeout (ip TEXT PRIMARY KEY, time TEXT);")
+        self.cursor.execute("CREATE TABLE IF NOT EXISTS bad (ip TEXT PRIMARY KEY, time TEXT);")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS invalid (logline TEXT PRIMARY KEY, time TEXT);")
         self.conn.commit()
 
@@ -80,26 +80,29 @@ class DumpsterDB:
         )
         self.uncommitted_writes.set()
 
-    def is_bad_ip(self, ip):
-        return bool(self.cursor.execute("SELECT * FROM bad_ip WHERE ip = ?;", (ip,)).fetchone())
+    def get_bad_ips(self):
+        return [row[0] for row in self.cursor.execute("SELECT ip FROM bad;").fetchall()]
 
-    def insert_bad_ip(self, ip):
+    def is_bad(self, ip):
+        return bool(self.cursor.execute("SELECT * FROM bad WHERE ip = ?;", (ip,)).fetchone())
+
+    def insert_bad(self, ip):
         """ Adds a bad IP to the database, if it doesn't already exist """
-        if self.is_bad_ip(ip):
+        if self.is_bad(ip):
             return self.logger.debug(f"Bad IP already exists in database: {colorize(ip, 'yellow')}")
         self.logger.info(f"Adding bad IP to database: {colorize(ip, 'red')}")
-        self.cursor.execute("INSERT INTO bad_ip VALUES (?, ?);", (ip, time()))
+        self.cursor.execute("INSERT INTO bad VALUES (?, ?);", (ip, time()))
         self.uncommitted_writes.set()
 
-    def is_blackholed(self, ip):
-        return bool(self.cursor.execute("SELECT * FROM blackhole WHERE ip = ?;", (ip,)).fetchone())
+    def is_timed_out(self, ip):
+        return bool(self.cursor.execute("SELECT * FROM timeout WHERE ip = ?;", (ip,)).fetchone())
 
-    def insert_blackhole(self, ip):
-        """ Adds a blackholed IP to the database, if it doesn't already exist """
-        if self.is_blackholed(ip):
-            return self.logger.debug(f"Blackhole IP already exists in database: {colorize(ip, 'yellow')}")
-        self.logger.info(f"Adding blackhole IP to database: {colorize(ip, 'red')}")
-        self.cursor.execute("INSERT INTO blackhole VALUES (?, ?);", (ip, time()))
+    def insert_timeout(self, ip):
+        """ Adds a timed out IP to the database, if it doesn't already exist """
+        if self.is_timed_out(ip):
+            return self.logger.debug(f"IP already exists in timeout database: {colorize(ip, 'yellow')}")
+        self.logger.info(f"Adding IP to the timeout database: {colorize(ip, 'red')}")
+        self.cursor.execute("INSERT INTO timeout VALUES (?, ?);", (ip, time()))
         self.uncommitted_writes.set()
 
     def commit(self):

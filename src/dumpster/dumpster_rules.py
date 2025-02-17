@@ -5,7 +5,7 @@ from json import loads
 
 from nftables import Nftables
 from zenlib.logging import loggify
-from zenlib.util import colorize
+from zenlib.util import colorize, handle_plural
 
 from .errors import NFTError, NFTSetItemExists
 
@@ -85,12 +85,12 @@ def get_default_args(method):
 
 @loggify
 class DumpsterRules:
-    def __init__(self, dumpster_table="dumpster", dumpster_family="inet", blackhole_timeout=300, *args, **kwargs):
+    def __init__(self, dumpster_table="dumpster", dumpster_family="inet", timeout=300, *args, **kwargs):
         self.nft = Nftables()
         self.nft.set_json_output(1)
         self.dumpster_table = dumpster_table
         self.dumpster_family = dumpster_family
-        self.blackhole_timeout = blackhole_timeout
+        self.timeout = timeout
         self.init_nftables()
 
     def init_nftables(self):
@@ -98,9 +98,9 @@ class DumpsterRules:
         self.add_table()
         for chain_name, chain_args in DUMPSTER_CHAINS.items():
             self.add_chain(chain_name, **chain_args)
-        self.add_set("dumpster_bad_ips", comment="Bad IPs")
-        self.add_set("dumpster_blackhole", timeout=self.blackhole_timeout)
-        self.add_set("dumpster_blackhole_alt", comment="Blackhole backup")
+        self.add_set("dumpster_bad", comment="Bad IPs")
+        self.add_set("dumpster_timeout", timeout=self.timeout)
+        self.add_set("dumpster_timeout_alt", comment="Timeout backup")
         for chain in ["input", "forward"]:
             self.add_rule(
                 [
@@ -108,7 +108,7 @@ class DumpsterRules:
                         "match": {
                             "op": "==",
                             "left": {"payload": {"protocol": "ip", "field": "saddr"}},
-                            "right": "@dumpster_bad_ips",
+                            "right": "@dumpster_bad",
                         }
                     },
                     {"counter": None},
@@ -124,15 +124,15 @@ class DumpsterRules:
                         "match": {
                             "op": "==",
                             "left": {"payload": {"protocol": "ip", "field": "saddr"}},
-                            "right": "@dumpster_blackhole",
+                            "right": "@dumpster_timeout",
                         }
                     },
                     {"counter": None},
-                    {"log": {"prefix": "Dumpster Blackhole: "}},
+                    {"log": {"prefix": "Dumpster timeout: "}},
                     {"drop": None},
                 ],
                 chain_name=chain,
-                comment="Blackhole IPs teporarily",
+                comment="Block IPs teporarily",
             )
             self.add_rule(
                 [
@@ -140,15 +140,15 @@ class DumpsterRules:
                         "match": {
                             "op": "==",
                             "left": {"payload": {"protocol": "ip", "field": "saddr"}},
-                            "right": "@dumpster_blackhole_alt",
+                            "right": "@dumpster_timeout_alt",
                         }
                     },
                     {"counter": None},
-                    {"log": {"prefix": "Dumpster Blackhole: "}},
+                    {"log": {"prefix": "Dumpster timeout: "}},
                     {"drop": None},
                 ],
                 chain_name=chain,
-                comment="Backup chain for blackhole rotation,",
+                comment="Backup chain for timeout rotation,",
             )
 
     @property
@@ -215,27 +215,28 @@ class DumpsterRules:
         self.run_cmd({"nftables": [{"add": {"rule": args}}]})
         self.logger.info(f"[{family}:{table}:{chain_name}] Rule added: {colorize(args, 'green')}")
 
+    @handle_plural
     def block(self, ip):
-        self.add_to_set("dumpster_bad_ips", ip, exist_ok=True)
+        self.add_to_set("dumpster_bad", ip, exist_ok=True)
         self.logger.info(f"Blocked IP: {colorize(ip, 'red')}")
 
-    def blackhole(self, ip, timeout=None):
-        timeout = timeout or self.blackhole_timeout
+    def time_out(self, ip, timeout=None):
+        timeout = timeout or self.timeout
         try:
-            if timeout == self.blackhole_timeout:
-                self.add_to_set("dumpster_blackhole", ip)
+            if timeout == self.timeout:
+                self.add_to_set("dumpster_timeout", ip)
             else:  # If it uses the default timeout, don't specify it
-                self.add_to_set("dumpster_blackhole", ip, timeout=timeout)
-            self.logger.info(f"[{colorize(timeout, "blue")}] Blackholed IP: {colorize(ip, 'red')}")
+                self.add_to_set("dumpster_timeout", ip, timeout=timeout)
+            self.logger.info(f"[{colorize(timeout, 'yellow')}s] Timed out IP: {colorize(ip, 'red')}")
         except NFTSetItemExists as e:
             timeout = e.expires + timeout  # Extend the timeout
-            self.logger.info(f"[{colorize(timeout, 'blue')}s] Updating blackholed IP: {colorize(ip, 'red')}")
+            self.logger.info(f"[{colorize(timeout, 'yellow')}s] Updating timed out IP: {colorize(ip, 'red')}")
             # Add to a backup set, so it is blocked while extending
-            self.add_to_set("dumpster_blackhole_alt", ip, exist_ok=True)
-            self.remove_from_set("dumpster_blackhole", ip)
+            self.add_to_set("dumpster_timeout_alt", ip, exist_ok=True)
+            self.remove_from_set("dumpster_timeout", ip)
             # Add the IP back to the main set with the new timeout
-            self.add_to_set("dumpster_blackhole", ip, timeout=timeout)
-            self.remove_from_set("dumpster_blackhole_alt", ip)
+            self.add_to_set("dumpster_timeout", ip, timeout=timeout)
+            self.remove_from_set("dumpster_timeout_alt", ip)
 
     @get_default_args
     def remove_from_set(self, set_name, element, table=None, family=None):
