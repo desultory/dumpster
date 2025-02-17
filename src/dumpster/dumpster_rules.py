@@ -9,7 +9,8 @@ from zenlib.util import colorize
 
 from .errors import NFTError, NFTSetItemExists
 
-DUMPSTER_CHAINS = {"input": {"hook": "input", "priority": 10, "chain_type": "filter", "policy": "accept"}}
+DUMPSTER_CHAINS = {"input": {"hook": "input", "priority": 10, "chain_type": "filter", "policy": "accept"},
+                   "forward": {"hook": "forward", "priority": 10, "chain_type": "filter", "policy": "accept"}}
 
 
 class ChainTypes(Enum):
@@ -99,39 +100,40 @@ class DumpsterRules:
             self.add_chain(chain_name, **chain_args)
         self.add_set("dumpster_blackhole", timeout=self.blackhole_timeout)
         self.add_set("dumpster_blackhole_alt", comment="Blackhole backup")
-        self.add_rule(
-            [
-                {
-                    "match": {
-                        "op": "==",
-                        "left": {"payload": {"protocol": "ip", "field": "saddr"}},
-                        "right": "@dumpster_blackhole",
-                    }
-                },
-                {"counter": None},
-                {"log": {"prefix": "Dumpster Blackhole: "}},
-                {"drop": None},
-            ],
-            chain_name="input",
-            comment="Blackhole IPs teporarily",
-        )
+        for chain in ["input", "forward"]:
+            self.add_rule(
+                [
+                    {
+                        "match": {
+                            "op": "==",
+                            "left": {"payload": {"protocol": "ip", "field": "saddr"}},
+                            "right": "@dumpster_blackhole",
+                        }
+                    },
+                    {"counter": None},
+                    {"log": {"prefix": "Dumpster Blackhole: "}},
+                    {"drop": None},
+                ],
+                chain_name=chain,
+                comment="Blackhole IPs teporarily",
+            )
 
-        self.add_rule(
-            [
-                {
-                    "match": {
-                        "op": "==",
-                        "left": {"payload": {"protocol": "ip", "field": "saddr"}},
-                        "right": "@dumpster_blackhole_alt",
-                    }
-                },
-                {"counter": None},
-                {"log": {"prefix": "Dumpster Blackhole: "}},
-                {"drop": None},
-            ],
-            chain_name="input",
-            comment="Backup chain for blackhole rotation,",
-        )
+            self.add_rule(
+                [
+                    {
+                        "match": {
+                            "op": "==",
+                            "left": {"payload": {"protocol": "ip", "field": "saddr"}},
+                            "right": "@dumpster_blackhole_alt",
+                        }
+                    },
+                    {"counter": None},
+                    {"log": {"prefix": "Dumpster Blackhole: "}},
+                    {"drop": None},
+                ],
+                chain_name=chain,
+                comment="Backup chain for blackhole rotation,",
+            )
 
     @property
     def ruleset(self):
